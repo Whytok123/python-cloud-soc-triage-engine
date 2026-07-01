@@ -1,0 +1,101 @@
+{
+  "Records": [
+    {
+      "eventTime": "2026-06-29T14:00:00Z",
+      "eventSource": "signin.amazonaws.com",
+      "eventName": "ConsoleLogin",
+      "awsRegion": "us-east-1",
+      "sourceIPAddress": "8.8.8.8",
+      "userIdentity": {
+        "type": "IAMUser",
+        "userName": "student-user",
+        "arn": "arn:aws:iam::123456789012:user/student-user"
+      },
+      "responseElements": {
+        "ConsoleLogin": "Failure"
+      }
+    },
+    {
+      "eventTime": "2026-06-29T14:01:00Z",
+      "eventSource": "signin.amazonaws.com",
+      "eventName": "ConsoleLogin",
+      "awsRegion": "us-east-1",
+      "sourceIPAddress": "8.8.8.8",
+      "userIdentity": {
+        "type": "IAMUser",
+        "userName": "student-user",
+        "arn": "arn:aws:iam::123456789012:user/student-user"
+      },
+      "responseElements": {
+        "ConsoleLogin": "Failure"
+      }
+    },
+    {
+      "eventTime": "2026-06-29T14:02:00Z",
+      "eventSource": "signin.amazonaws.com",
+      "eventName": "ConsoleLogin",
+      "awsRegion": "us-east-1",
+      "sourceIPAddress": "8.8.8.8",
+      "userIdentity": {
+        "type": "IAMUser",
+        "userName": "student-user",
+        "arn": "arn:aws:iam::123456789012:user/student-user"
+      },
+      "responseElements": {
+        "ConsoleLogin": "Failure"
+      }
+    },
+    {
+      "eventTime": "2026-06-29T14:03:00Z",
+      "eventSource": "signin.amazonaws.com",
+      "eventName": "ConsoleLogin",
+      "awsRegion": "us-east-1",
+      "sourceIPAddress": "8.8.8.8",
+      "userIdentity": {
+        "type": "IAMUser",
+        "userName": "student-user",
+        "arn": "arn:aws:iam::123456789012:user/student-user"
+      },
+      "responseElements": {
+        "ConsoleLogin": "Success"
+      }
+    },
+    {
+      "eventTime": "2026-06-29T14:10:00Z",
+      "eventSource": "iam.amazonaws.com",
+      "eventName": "CreateAccessKey",
+      "awsRegion": "us-east-1",
+      "sourceIPAddress": "44.55.66.77",
+      "userIdentity": {
+        "type": "IAMUser",
+        "userName": "admin-user",
+        "arn": "arn:aws:iam::123456789012:user/admin-user"
+      }
+    },
+    {
+      "eventTime": "2026-06-29T14:20:00Z",
+      "eventSource": "iam.amazonaws.com",
+      "eventName": "AttachUserPolicy",
+      "awsRegion": "us-east-1",
+      "sourceIPAddress": "44.55.66.77",
+      "userIdentity": {
+        "type": "IAMUser",
+        "userName": "admin-user",
+        "arn": "arn:aws:iam::123456789012:user/admin-user"
+      }
+    },
+    {
+      "eventTime": "2026-06-29T14:30:00Z",
+      "eventSource": "cloudtrail.amazonaws.com",
+      "eventName": "StopLogging",
+      "awsRegion": "us-east-1",
+      "sourceIPAddress": "99.88.77.66",
+      "userIdentity": {
+        "type": "IAMUser",
+        "userName": "unknown-admin",
+        "arn": "arn:aws:iam::123456789012:user/unknown-admin"
+      }
+    }
+  ]
+}
+
