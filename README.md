@@ -19,30 +19,39 @@ CloudTrail JSON Logs -> Parser -> Detection Rules -> Enrichment -> Severity Scor
 - Includes SOC playbooks and incident report template
 
 ## Detection Rules
-AWS-AUTH-001: Multiple failed logins followed by success - High
-AWS-IAM-001: New IAM access key created - Medium
-AWS-IAM-002: Possible IAM privilege escalation - High
-AWS-LOG-001: CloudTrail logging modified or disabled - Critical
+AWS-AUTH-001: Multiple failed logins followed by success - High  
+AWS-IAM-001: New IAM access key created - Medium  
+AWS-IAM-002: Possible IAM privilege escalation - High  
+AWS-LOG-001: CloudTrail logging modified or disabled - Critical  
+
+## Dashboard Screenshot
+![Cloud SOC Triage Dashboard](screenshots/dashboard.png)
 
 ## How to Run
 
 1. Create and activate virtual environment:
-python3 -m venv venv
+
+python3 -m venv venv  
 source venv/bin/activate
 
 2. Install dependencies:
+
 pip install -r requirements.txt
 
 3. Run the detection engine:
+
 python src/main.py
 
 4. View generated alerts:
+
 cat data/alerts/alerts.csv
 
 5. Run the dashboard:
+
 streamlit run dashboard/app.py
 
 6. Open in browser:
+
 http://localhost:8501
 
 ## Project Structure
@@ -50,6 +59,7 @@ http://localhost:8501
 - data/raw/ contains sample CloudTrail logs
 - data/alerts/ contains generated alerts
 - dashboard/ contains the Streamlit dashboard
+- screenshots/ contains dashboard screenshots
 - playbooks/ contains SOC response playbooks
 - reports/ contains incident report templates
 
