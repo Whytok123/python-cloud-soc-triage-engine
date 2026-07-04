@@ -1,9 +1,3 @@
-Yes. Use this updated README. Paste it directly into GitHub `README.md` using the website edit button.
-
-Copy from `# Python Cloud SOC Triage Engine` down to the end.
-
----
-
 # Python Cloud SOC Triage Engine
 
 ## Overview
