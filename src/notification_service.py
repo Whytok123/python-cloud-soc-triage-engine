@@ -7,7 +7,18 @@ NOTIFICATION_DIR = "data/notifications"
 JSON_OUTBOX = os.path.join(NOTIFICATION_DIR, "notification_outbox.json")
 TEXT_OUTBOX = os.path.join(NOTIFICATION_DIR, "email_outbox.txt")
 
-NOTIFIABLE_SEVERITIES = {"High", "Critical"}
+NOTIFICATION_PRIORITIES = {
+    "Critical": {
+        "priority": "P1",
+        "urgency": "immediate",
+        "delivery_timing": "send_immediately",
+    },
+    "High": {
+        "priority": "P2",
+        "urgency": "normal",
+        "delivery_timing": "send_during_triage_queue",
+    },
+}
 
 
 def utc_now_iso():
@@ -15,7 +26,20 @@ def utc_now_iso():
 
 
 def should_notify(alert):
-    return alert.get("severity") in NOTIFIABLE_SEVERITIES
+    return alert.get("severity") in NOTIFICATION_PRIORITIES
+
+
+def get_notification_priority(alert):
+    severity = alert.get("severity", "Unknown")
+
+    return NOTIFICATION_PRIORITIES.get(
+        severity,
+        {
+            "priority": "P3",
+            "urgency": "none",
+            "delivery_timing": "do_not_notify",
+        },
+    )
 
 
 def build_notification(alert, notification_id):
@@ -33,11 +57,19 @@ def build_notification(alert, notification_id):
     )
     analyst_summary = alert.get("analyst_summary", "No analyst summary available.")
 
-    subject = f"[{severity}] Cloud SOC Alert - {title}"
+    priority_info = get_notification_priority(alert)
+    priority = priority_info["priority"]
+    urgency = priority_info["urgency"]
+    delivery_timing = priority_info["delivery_timing"]
+
+    subject = f"[{priority}][{severity}] Cloud SOC Alert - {title}"
 
     body = (
         f"{severity.upper()} CLOUD SOC ALERT\n\n"
         f"Notification ID: {notification_id}\n"
+        f"Priority: {priority}\n"
+        f"Urgency: {urgency}\n"
+        f"Delivery Timing: {delivery_timing}\n"
         f"Rule ID: {rule_id}\n"
         f"Title: {title}\n"
         f"Risk Score: {risk_score}\n"
@@ -53,6 +85,9 @@ def build_notification(alert, notification_id):
         "created_at": utc_now_iso(),
         "channel": "local_email_outbox",
         "delivery_status": "simulated",
+        "priority": priority,
+        "urgency": urgency,
+        "delivery_timing": delivery_timing,
         "subject": subject,
         "severity": severity,
         "rule_id": rule_id,

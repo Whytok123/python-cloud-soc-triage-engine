@@ -420,3 +420,20 @@ The Streamlit dashboard also includes a Notification Status section showing the 
 
 This feature demonstrates SOC alerting workflow design while keeping the project safe for GitHub. Real email sending is intentionally not enabled by default, so no passwords, API keys, or SMTP credentials are required.
 
+
+
+## Notification Priority Logic
+
+The local notification outbox uses priority-based alert routing:
+
+- Critical alerts generate P1 immediate notifications
+- High alerts generate P2 normal notifications
+- Medium alerts do not generate notifications
+
+Notification subjects include both priority and severity, for example:
+
+- [P1][Critical] Cloud SOC Alert - Root account console login detected
+- [P2][High] Cloud SOC Alert - Possible public S3 bucket exposure
+
+This simulates a realistic SOC notification workflow where only high-priority security events are escalated into the alert outbox.
+
