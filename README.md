@@ -1,12 +1,56 @@
 # Python Cloud SOC Triage Engine
 
+![Python](https://img.shields.io/badge/Python-3.13-blue)
+![Streamlit](https://img.shields.io/badge/Dashboard-Streamlit-red)
+![SQLite](https://img.shields.io/badge/Database-SQLite-lightgrey)
+![Docker](https://img.shields.io/badge/Docker-Supported-blue)
+![Tests](https://img.shields.io/badge/Tests-9%20Passing-brightgreen)
+![Status](https://img.shields.io/badge/Status-Portfolio%20Ready-success)
+
 ## Overview
 
-Python Cloud SOC Triage Engine is an offline cloud security detection, enrichment, correlation, reporting, and case management lab.
+Python Cloud SOC Triage Engine is an offline-first cloud security detection and triage platform built for SOC analyst portfolio demonstration.
 
-The project analyzes AWS CloudTrail-style logs, detects suspicious cloud activity, maps detections to MITRE ATT&CK, enriches alerts with local user and IP context, stores incidents in SQLite, generates incident reports, and provides a Streamlit dashboard for SOC-style investigation.
+The project simulates a realistic cloud security workflow: it ingests AWS CloudTrail-style logs, detects suspicious behavior, enriches alerts with local context, correlates related activity into incidents, maps detections to MITRE ATT&CK, prioritizes notifications, supports analyst case management, and generates incident reports.
 
-This project demonstrates Cloud Security Analyst, Cloud SOC Analyst, SOC Analyst, and junior detection engineering skills without requiring paid AWS infrastructure.
+The main version runs fully offline with sample telemetry, so recruiters and reviewers can run the project without an AWS account. Optional AWS CloudTrail Event History ingestion is also supported for users who want to test with real AWS account activity.
+
+## Project Impact
+
+| Capability | Current Result |
+|---|---|
+| CloudTrail-style events processed | 10 sample events |
+| Rule-based detections | 7 alerts |
+| Correlation detections | 1 compromise-chain alert |
+| Total incidents generated | 8 incidents |
+| MITRE ATT&CK mapped detections | 8 mapped alerts |
+| Analyst reports generated | 8 markdown reports |
+| Automated tests | 9 passing tests |
+| Notification routing | Critical = P1, High = P2, Medium = no notification |
+| Runtime model | Offline by default, optional AWS ingestion |
+
+## SOC Workflow
+
+The project follows a practical SOC triage story:
+
+1. Ingest CloudTrail-style logs.
+2. Normalize events with a Python parser.
+3. Detect suspicious IAM, root, S3, CloudTrail, and network activity.
+4. Correlate related events into a possible cloud account compromise chain.
+5. Score severity and risk.
+6. Map detections to MITRE ATT&CK.
+7. Enrich alerts with local user and IP context.
+8. Store incidents in SQLite.
+9. Prioritize P1/P2 notifications.
+10. Investigate incidents in the Streamlit dashboard.
+11. Generate markdown incident reports.
+
+## Why This Project Stands Out
+
+This is not only a log parser. It models an end-to-end SOC workflow.
+
+The project includes detection logic, enrichment, correlation, case management, reporting, Docker support, tests, optional AWS ingestion, analyst summaries, and notification routing. It is designed to be easy to run locally while still showing realistic cloud security engineering and analyst skills.
+
 
 ## Dashboard Screenshot
 
