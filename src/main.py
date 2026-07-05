@@ -1,3 +1,4 @@
+import os
 from parser import load_cloudtrail_file, normalize_event
 from detections import run_all_detections
 from correlation import run_correlation_detections
@@ -10,7 +11,8 @@ from database import save_alerts_to_database
 
 
 def main():
-    raw_events = load_cloudtrail_file("data/raw/sample_cloudtrail.json")
+    input_file = os.getenv("SOC_INPUT_FILE", "data/raw/sample_cloudtrail.json")
+    raw_events = load_cloudtrail_file(input_file)
 
     normalized_events = []
     for event in raw_events:
