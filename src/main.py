@@ -5,6 +5,7 @@ from enrichment import enrich_alert
 from severity import add_severity_score
 from mitre_mapping import add_mitre_mapping
 from local_enrichment import enrich_with_local_context
+from alert_summary import add_analyst_summary
 from ingestion_config import (
     add_ingestion_metadata,
     load_ingestion_config,
@@ -35,6 +36,7 @@ def main():
         alert = add_mitre_mapping(alert)
         alert = enrich_with_local_context(alert)
         alert = add_ingestion_metadata(alert, ingestion_config, ingested_at)
+        alert = add_analyst_summary(alert)
         alert["status"] = "Open"
 
         final_alerts.append(alert)

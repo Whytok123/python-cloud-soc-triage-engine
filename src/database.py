@@ -31,6 +31,7 @@ def initialize_database():
             description TEXT,
             evidence TEXT,
             recommended_action TEXT,
+            analyst_summary TEXT,
             mitre_tactic TEXT,
             mitre_technique_id TEXT,
             mitre_technique_name TEXT,
@@ -57,8 +58,25 @@ def generate_incident_id(number: int) -> str:
     return f"INC-{number:04d}"
 
 
+
+def ensure_database_schema(db_path="data/incidents/incidents.db"):
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+
+        existing_columns = [
+            row[1]
+            for row in cursor.execute("PRAGMA table_info(incidents)").fetchall()
+        ]
+
+        if "analyst_summary" not in existing_columns:
+            cursor.execute("ALTER TABLE incidents ADD COLUMN analyst_summary TEXT")
+
+        conn.commit()
+
+
 def save_alerts_to_database(alerts: list[dict]) -> None:
     initialize_database()
+    ensure_database_schema()
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -86,6 +104,7 @@ def save_alerts_to_database(alerts: list[dict]) -> None:
                 description,
                 evidence,
                 recommended_action,
+                analyst_summary,
                 mitre_tactic,
                 mitre_technique_id,
                 mitre_technique_name,
@@ -102,7 +121,7 @@ def save_alerts_to_database(alerts: list[dict]) -> None:
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             incident_id,
             alert.get("rule_id", ""),
@@ -118,6 +137,7 @@ def save_alerts_to_database(alerts: list[dict]) -> None:
             alert.get("description", ""),
             alert.get("evidence", ""),
             alert.get("recommended_action", ""),
+            alert.get("analyst_summary", ""),
             alert.get("mitre_tactic", ""),
             alert.get("mitre_technique_id", ""),
             alert.get("mitre_technique_name", ""),

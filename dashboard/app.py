@@ -209,6 +209,9 @@ if incident:
     st.markdown("### Local Risk Notes")
     st.warning(incident["local_risk_notes"])
 
+    st.markdown("### Analyst Summary")
+    st.info(incident.get("analyst_summary", "No analyst summary available."))
+
     st.markdown("### Description")
     st.write(incident["description"])
 
@@ -252,7 +255,7 @@ if incident:
 
 st.divider()
 
-st.subheader("Analyst Summary")
+st.subheader("Dashboard Summary")
 
 summary_text = f"""
 This dashboard contains {total_alerts} cloud security alerts.

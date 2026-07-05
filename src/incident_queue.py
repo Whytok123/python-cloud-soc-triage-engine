@@ -19,6 +19,7 @@ def write_alerts_to_csv(alerts: list[dict], output_file: str) -> None:
         "description",
         "evidence",
         "recommended_action",
+        "analyst_summary",
         "status"
     ]
 
