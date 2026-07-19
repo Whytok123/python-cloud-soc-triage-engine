@@ -15,6 +15,11 @@ INPUT_ROOT = (
     / "test_events"
 )
 
+TEST_API_KEY = (
+    "test-only-soc-api-key-"
+    "do-not-use-in-production"
+)
+
 
 def build_packet() -> dict:
     """Return a minimal valid persisted case packet."""
@@ -41,10 +46,19 @@ def build_client(
     app = create_app(
         database_path=tmp_path / "cases.db",
         input_root=INPUT_ROOT,
+        api_key=TEST_API_KEY,
+    )
+
+    client = TestClient(app)
+
+    client.headers.update(
+        {
+            "X-SOC-API-Key": TEST_API_KEY,
+        }
     )
 
     return (
-        TestClient(app),
+        client,
         app,
     )
 
@@ -255,3 +269,88 @@ def test_invalid_case_status_returns_422(tmp_path):
     )
 
     assert response.status_code == 422
+
+
+def test_health_is_public_without_api_key(
+    tmp_path,
+):
+    app = create_app(
+        database_path=tmp_path / "cases.db",
+        input_root=INPUT_ROOT,
+        api_key=TEST_API_KEY,
+    )
+
+    client = TestClient(app)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
+
+
+def test_missing_api_key_is_rejected(
+    tmp_path,
+):
+    app = create_app(
+        database_path=tmp_path / "cases.db",
+        input_root=INPUT_ROOT,
+        api_key=TEST_API_KEY,
+    )
+
+    client = TestClient(app)
+
+    response = client.get("/cases")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == (
+        "Invalid or missing SOC API key"
+    )
+
+
+def test_invalid_api_key_is_rejected(
+    tmp_path,
+):
+    app = create_app(
+        database_path=tmp_path / "cases.db",
+        input_root=INPUT_ROOT,
+        api_key=TEST_API_KEY,
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/cases",
+        headers={
+            "X-SOC-API-Key": "incorrect-key",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.headers[
+        "www-authenticate"
+    ] == "ApiKey"
+
+
+def test_missing_server_api_key_fails_closed(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.delenv(
+        "SOC_API_KEY",
+        raising=False,
+    )
+
+    app = create_app(
+        database_path=tmp_path / "cases.db",
+        input_root=INPUT_ROOT,
+        api_key=None,
+    )
+
+    client = TestClient(app)
+
+    response = client.get("/cases")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "SOC API authentication is not configured"
+    )

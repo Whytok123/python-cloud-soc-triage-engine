@@ -17,6 +17,7 @@ from src.api.dependencies import (
     DatabasePathDependency,
     InputRootDependency,
 )
+from src.api.security import configure_api_key_auth
 from src.api.schemas import (
     AuditEventResponse,
     CaseResponse,
@@ -101,6 +102,7 @@ def create_app(
     *,
     database_path: str | Path | None = None,
     input_root: str | Path | None = None,
+    api_key: str | None = None,
 ) -> FastAPI:
     """Create and configure the SOC API application."""
 
@@ -125,6 +127,19 @@ def create_app(
         exist_ok=True,
     )
 
+    configured_api_key = (
+        api_key
+        if api_key is not None
+        else os.getenv("SOC_API_KEY")
+    )
+
+    resolved_api_key = (
+        configured_api_key.strip()
+        if isinstance(configured_api_key, str)
+        and configured_api_key.strip()
+        else None
+    )
+
     app = FastAPI(
         title="AI SOC Copilot API",
         description=(
@@ -140,6 +155,9 @@ def create_app(
     app.state.case_store = SQLiteCaseStore(
         resolved_database
     )
+    app.state.api_key = resolved_api_key
+
+    configure_api_key_auth(app)
 
     @app.get(
         "/health",
