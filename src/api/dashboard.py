@@ -23,6 +23,7 @@ from fastapi.responses import (
 from fastapi.templating import Jinja2Templates
 
 from src.cases.models import ALLOWED_CASE_STATUSES
+from src.identity.models import ALLOWED_ANALYST_ROLES
 from src.identity.permissions import (
     Permission,
     has_permission,
@@ -710,3 +711,388 @@ def dashboard_case_update(
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
+
+
+def _active_admin_count(
+    identity_store,
+) -> int:
+    """Count active administrator accounts."""
+
+    return sum(
+        1
+        for analyst in identity_store.list_accounts()
+        if (
+            analyst.role == "admin"
+            and analyst.is_active
+        )
+    )
+
+
+def _admin_account(
+    request: Request,
+):
+    """Return an authorized administrator."""
+
+    account = _current_account(request)
+
+    if account is None:
+        return None
+
+    if not has_permission(
+        account.role,
+        Permission.MANAGE_ANALYSTS,
+    ):
+        return False
+
+    return account
+
+
+@router.get(
+    "/dashboard/admin/analysts",
+    response_class=HTMLResponse,
+)
+def dashboard_admin_analysts(
+    request: Request,
+) -> Response:
+    """Display analyst-account administration."""
+
+    account = _admin_account(request)
+
+    if account is None:
+        return _login_redirect()
+
+    if account is False:
+        return _permission_denied(
+            "Administrator access is required."
+        )
+
+    identity_store = (
+        request.app.state.identity_store
+    )
+
+    analysts = identity_store.list_accounts()
+
+    notice = request.query_params.get(
+        "notice"
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard/admin/analysts.html",
+        context={
+            "current_account": account,
+            "analysts": analysts,
+            "analyst_roles": sorted(
+                ALLOWED_ANALYST_ROLES
+            ),
+            "csrf_token": _csrf_token(request),
+            "notice": notice,
+        },
+    )
+
+
+@router.post(
+    "/dashboard/admin/analysts/create"
+)
+def dashboard_admin_create_analyst(
+    request: Request,
+    csrf_token: Annotated[
+        str,
+        Form(min_length=1),
+    ],
+    email: Annotated[
+        str,
+        Form(min_length=3),
+    ],
+    display_name: Annotated[
+        str,
+        Form(min_length=1),
+    ],
+    role: Annotated[
+        str,
+        Form(min_length=1),
+    ],
+    password: Annotated[
+        str,
+        Form(min_length=12),
+    ],
+    password_confirmation: Annotated[
+        str,
+        Form(min_length=12),
+    ],
+) -> Response:
+    """Create an analyst account as an admin."""
+
+    account = _admin_account(request)
+
+    if account is None:
+        return _login_redirect()
+
+    if account is False:
+        return _permission_denied(
+            "Administrator access is required."
+        )
+
+    if not _valid_csrf_token(
+        request,
+        csrf_token,
+    ):
+        return _csrf_failure()
+
+    if password != password_confirmation:
+        return HTMLResponse(
+            content=(
+                "<h1>Account creation failed</h1>"
+                "<p>Passwords do not match.</p>"
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    normalized_role = role.strip().lower()
+
+    if normalized_role not in (
+        ALLOWED_ANALYST_ROLES
+    ):
+        return HTMLResponse(
+            content=(
+                "<h1>Account creation failed</h1>"
+                "<p>Invalid analyst role.</p>"
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    identity_store = (
+        request.app.state.identity_store
+    )
+
+    try:
+        identity_store.create_account(
+            email=email,
+            display_name=display_name,
+            password=password,
+            role=normalized_role,
+        )
+    except ValueError as error:
+        return HTMLResponse(
+            content=(
+                "<h1>Account creation failed</h1>"
+                f"<p>{error}</p>"
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return RedirectResponse(
+        url=(
+            "/dashboard/admin/analysts"
+            "?notice=created"
+        ),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/dashboard/admin/analysts/{user_id}/role"
+)
+def dashboard_admin_update_role(
+    request: Request,
+    user_id: str,
+    csrf_token: Annotated[
+        str,
+        Form(min_length=1),
+    ],
+    role: Annotated[
+        str,
+        Form(min_length=1),
+    ],
+) -> Response:
+    """Change an analyst role as an admin."""
+
+    account = _admin_account(request)
+
+    if account is None:
+        return _login_redirect()
+
+    if account is False:
+        return _permission_denied(
+            "Administrator access is required."
+        )
+
+    if not _valid_csrf_token(
+        request,
+        csrf_token,
+    ):
+        return _csrf_failure()
+
+    identity_store = (
+        request.app.state.identity_store
+    )
+
+    target = identity_store.get_by_id(
+        user_id
+    )
+
+    if target is None:
+        return HTMLResponse(
+            content="<h1>Account not found</h1>",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    normalized_role = role.strip().lower()
+
+    if normalized_role not in (
+        ALLOWED_ANALYST_ROLES
+    ):
+        return HTMLResponse(
+            content="<h1>Invalid analyst role</h1>",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if (
+        target.user_id == account.user_id
+        and normalized_role != account.role
+    ):
+        return _permission_denied(
+            "You cannot change your own "
+            "administrator role."
+        )
+
+    removing_active_admin = (
+        target.role == "admin"
+        and target.is_active
+        and normalized_role != "admin"
+    )
+
+    if (
+        removing_active_admin
+        and _active_admin_count(
+            identity_store
+        )
+        <= 1
+    ):
+        return _permission_denied(
+            "At least one active administrator "
+            "must remain."
+        )
+
+    identity_store.update_role(
+        target.user_id,
+        role=normalized_role,
+    )
+
+    return RedirectResponse(
+        url=(
+            "/dashboard/admin/analysts"
+            "?notice=role-updated"
+        ),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/dashboard/admin/analysts/{user_id}/active"
+)
+def dashboard_admin_set_active(
+    request: Request,
+    user_id: str,
+    csrf_token: Annotated[
+        str,
+        Form(min_length=1),
+    ],
+    is_active: Annotated[
+        str,
+        Form(min_length=1),
+    ],
+) -> Response:
+    """Enable or disable an analyst account."""
+
+    account = _admin_account(request)
+
+    if account is None:
+        return _login_redirect()
+
+    if account is False:
+        return _permission_denied(
+            "Administrator access is required."
+        )
+
+    if not _valid_csrf_token(
+        request,
+        csrf_token,
+    ):
+        return _csrf_failure()
+
+    identity_store = (
+        request.app.state.identity_store
+    )
+
+    target = identity_store.get_by_id(
+        user_id
+    )
+
+    if target is None:
+        return HTMLResponse(
+            content="<h1>Account not found</h1>",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    normalized_active = (
+        is_active.strip().lower()
+    )
+
+    if normalized_active not in {
+        "true",
+        "false",
+    }:
+        return HTMLResponse(
+            content="<h1>Invalid account state</h1>",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    desired_active = (
+        normalized_active == "true"
+    )
+
+    if (
+        target.user_id == account.user_id
+        and not desired_active
+    ):
+        return _permission_denied(
+            "You cannot disable your own account."
+        )
+
+    disabling_active_admin = (
+        target.role == "admin"
+        and target.is_active
+        and not desired_active
+    )
+
+    if (
+        disabling_active_admin
+        and _active_admin_count(
+            identity_store
+        )
+        <= 1
+    ):
+        return _permission_denied(
+            "At least one active administrator "
+            "must remain."
+        )
+
+    identity_store.set_active(
+        target.user_id,
+        is_active=desired_active,
+    )
+
+    notice = (
+        "reactivated"
+        if desired_active
+        else "disabled"
+    )
+
+    return RedirectResponse(
+        url=(
+            "/dashboard/admin/analysts"
+            f"?notice={notice}"
+        ),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )

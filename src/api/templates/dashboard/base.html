@@ -30,7 +30,16 @@
         </a>
 
         {% if request.session.get("authenticated") %}
-        <form
+        {% if current_account and current_account.role == "admin" %}
+            <a
+                class="button button-secondary"
+                href="/dashboard/admin/analysts"
+            >
+                Manage analysts
+            </a>
+            {% endif %}
+
+            <form
             method="post"
             action="/dashboard/logout"
         >

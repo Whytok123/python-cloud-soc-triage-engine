@@ -1,0 +1,314 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}
+Analyst Administration
+{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">
+            Identity and access management
+        </p>
+
+        <h1>Analyst administration</h1>
+
+        <p class="muted">
+            Create accounts, manage roles, and
+            control access to the SOC dashboard.
+        </p>
+    </div>
+</section>
+
+{% if notice == "created" %}
+<div class="alert alert-success">
+    Analyst account created successfully.
+</div>
+{% elif notice == "role-updated" %}
+<div class="alert alert-success">
+    Analyst role updated successfully.
+</div>
+{% elif notice == "disabled" %}
+<div class="alert alert-success">
+    Analyst account disabled.
+</div>
+{% elif notice == "reactivated" %}
+<div class="alert alert-success">
+    Analyst account reactivated.
+</div>
+{% endif %}
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">
+                New account
+            </p>
+
+            <h2>Create analyst account</h2>
+        </div>
+    </div>
+
+    <form
+        method="post"
+        action="/dashboard/admin/analysts/create"
+        class="admin-account-form"
+    >
+        <input
+            type="hidden"
+            name="csrf_token"
+            value="{{ csrf_token }}"
+        >
+
+        <div>
+            <label for="display_name">
+                Display name
+            </label>
+
+            <input
+                id="display_name"
+                name="display_name"
+                type="text"
+                required
+            >
+        </div>
+
+        <div>
+            <label for="email">
+                Email
+            </label>
+
+            <input
+                id="email"
+                name="email"
+                type="email"
+                required
+            >
+        </div>
+
+        <div>
+            <label for="role">
+                Role
+            </label>
+
+            <select
+                id="role"
+                name="role"
+                required
+            >
+                {% for role_name in analyst_roles %}
+                <option value="{{ role_name }}">
+                    {{ role_name.replace("_", " ").title() }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label for="password">
+                Temporary password
+            </label>
+
+            <input
+                id="password"
+                name="password"
+                type="password"
+                minlength="12"
+                required
+                autocomplete="new-password"
+            >
+        </div>
+
+        <div>
+            <label for="password_confirmation">
+                Confirm password
+            </label>
+
+            <input
+                id="password_confirmation"
+                name="password_confirmation"
+                type="password"
+                minlength="12"
+                required
+                autocomplete="new-password"
+            >
+        </div>
+
+        <div class="admin-form-action">
+            <button
+                class="button button-primary"
+                type="submit"
+            >
+                Create account
+            </button>
+        </div>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">
+                Access directory
+            </p>
+
+            <h2>Analyst accounts</h2>
+        </div>
+
+        <span class="count-badge">
+            {{ analysts | length }} accounts
+        </span>
+    </div>
+
+    <div class="table-scroll">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Analyst</th>
+                    <th>Role</th>
+                    <th>State</th>
+                    <th>Last login</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for analyst in analysts %}
+                <tr>
+                    <td>
+                        <strong>
+                            {{ analyst.display_name }}
+                        </strong>
+
+                        <small>
+                            {{ analyst.email }}
+                        </small>
+
+                        {% if analyst.user_id == current_account.user_id %}
+                        <span class="current-user-label">
+                            You
+                        </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <form
+                            method="post"
+                            action="/dashboard/admin/analysts/{{ analyst.user_id }}/role"
+                            class="inline-admin-form"
+                        >
+                            <input
+                                type="hidden"
+                                name="csrf_token"
+                                value="{{ csrf_token }}"
+                            >
+
+                            <select
+                                name="role"
+                                aria-label="Role for {{ analyst.email }}"
+                                {% if analyst.user_id == current_account.user_id %}
+                                disabled
+                                {% endif %}
+                            >
+                                {% for role_name in analyst_roles %}
+                                <option
+                                    value="{{ role_name }}"
+                                    {% if role_name == analyst.role %}
+                                    selected
+                                    {% endif %}
+                                >
+                                    {{ role_name.replace("_", " ").title() }}
+                                </option>
+                                {% endfor %}
+                            </select>
+
+                            {% if analyst.user_id != current_account.user_id %}
+                            <button
+                                class="button button-secondary button-small"
+                                type="submit"
+                            >
+                                Save role
+                            </button>
+                            {% endif %}
+                        </form>
+                    </td>
+
+                    <td>
+                        {% if analyst.is_active %}
+                        <span class="state-badge state-active">
+                            Active
+                        </span>
+                        {% else %}
+                        <span class="state-badge state-disabled">
+                            Disabled
+                        </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if analyst.last_login_at %}
+                            {{ analyst.last_login_at | soc_datetime }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if analyst.user_id != current_account.user_id %}
+                        <form
+                            method="post"
+                            action="/dashboard/admin/analysts/{{ analyst.user_id }}/active"
+                        >
+                            <input
+                                type="hidden"
+                                name="csrf_token"
+                                value="{{ csrf_token }}"
+                            >
+
+                            {% if analyst.is_active %}
+                            <input
+                                type="hidden"
+                                name="is_active"
+                                value="false"
+                            >
+
+                            <button
+                                class="button button-danger button-small"
+                                type="submit"
+                            >
+                                Disable
+                            </button>
+                            {% else %}
+                            <input
+                                type="hidden"
+                                name="is_active"
+                                value="true"
+                            >
+
+                            <button
+                                class="button button-secondary button-small"
+                                type="submit"
+                            >
+                                Reactivate
+                            </button>
+                            {% endif %}
+                        </form>
+                        {% else %}
+                        <span class="muted">
+                            Current session
+                        </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5">
+                        No analyst accounts found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
