@@ -23,6 +23,10 @@ from fastapi.responses import (
 from fastapi.templating import Jinja2Templates
 
 from src.cases.models import ALLOWED_CASE_STATUSES
+from src.identity.permissions import (
+    Permission,
+    has_permission,
+)
 
 
 router = APIRouter(
@@ -445,6 +449,26 @@ def dashboard_case_detail(
     )
 
 
+TERMINAL_CASE_STATUSES = {
+    "resolved",
+    "closed",
+}
+
+
+def _permission_denied(
+    message: str,
+) -> HTMLResponse:
+    """Return a consistent RBAC denial response."""
+
+    return HTMLResponse(
+        content=(
+            "<h1>Forbidden</h1>"
+            f"<p>{message}</p>"
+        ),
+        status_code=status.HTTP_403_FORBIDDEN,
+    )
+
+
 @router.post(
     "/dashboard/cases/{case_id}/update"
 )
@@ -468,9 +492,11 @@ def dashboard_case_update(
         Form(),
     ] = "",
 ) -> Response:
-    """Update a case through the analyst dashboard."""
+    """Update a case with role-based authorization."""
 
-    if not _authenticated(request):
+    account = _current_account(request)
+
+    if account is None:
         return _login_redirect()
 
     if not _valid_csrf_token(
@@ -479,32 +505,134 @@ def dashboard_case_update(
     ):
         return _csrf_failure()
 
-    normalized_status = (
+    store = request.app.state.case_store
+    case = store.get_case(case_id)
+
+    if case is None:
+        return HTMLResponse(
+            content="<h1>Case not found</h1>",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    requested_status = (
         case_status.strip().lower()
     )
 
     if (
-        normalized_status
+        requested_status
         not in ALLOWED_CASE_STATUSES
     ):
         return HTMLResponse(
+            content="<h1>Invalid case status</h1>",
+            status_code=(
+                status.HTTP_400_BAD_REQUEST
+            ),
+        )
+
+    requested_assignee = (
+        assigned_to.strip().lower()
+        or None
+    )
+
+    current_assignee = (
+        case.assigned_to.strip().lower()
+        if isinstance(case.assigned_to, str)
+        and case.assigned_to.strip()
+        else None
+    )
+
+    normalized_note = note.strip()
+
+    status_changed = (
+        requested_status != case.status
+    )
+
+    assignment_changed = (
+        requested_assignee
+        != current_assignee
+    )
+
+    if normalized_note and not has_permission(
+        account.role,
+        Permission.ADD_NOTES,
+    ):
+        return _permission_denied(
+            "Your role cannot add case notes."
+        )
+
+    if status_changed:
+        if (
+            requested_status
+            in TERMINAL_CASE_STATUSES
+        ):
+            required_permission = (
+                Permission.RESOLVE_CASES
+            )
+        else:
+            required_permission = (
+                Permission.UPDATE_CASE_STATUS
+            )
+
+        if not has_permission(
+            account.role,
+            required_permission,
+        ):
+            return _permission_denied(
+                "Your role cannot perform this "
+                "case-status transition."
+            )
+
+    if assignment_changed:
+        assigning_to_self = (
+            requested_assignee
+            == account.email
+            and current_assignee
+            in {
+                None,
+                account.email,
+            }
+        )
+
+        if assigning_to_self:
+            allowed = has_permission(
+                account.role,
+                Permission.ASSIGN_SELF,
+            )
+        else:
+            allowed = has_permission(
+                account.role,
+                Permission.REASSIGN_CASES,
+            )
+
+        if not allowed:
+            return _permission_denied(
+                "Your role cannot assign this "
+                "case to another analyst."
+            )
+
+    if (
+        not status_changed
+        and not assignment_changed
+        and not normalized_note
+    ):
+        return HTMLResponse(
             content=(
-                "<h1>Invalid case status</h1>"
+                "<h1>No changes submitted</h1>"
             ),
             status_code=(
                 status.HTTP_400_BAD_REQUEST
             ),
         )
 
-    store = request.app.state.case_store
-
     try:
         store.update_case(
             case_id,
-            status=normalized_status,
-            assigned_to=assigned_to,
-            note=note,
-            actor=_current_account(request).email,
+            status=requested_status,
+            assigned_to=(
+                requested_assignee or ""
+            ),
+            note=normalized_note,
+            actor=account.email,
         )
     except KeyError:
         return HTMLResponse(
@@ -529,3 +657,4 @@ def dashboard_case_update(
         ),
         status_code=status.HTTP_303_SEE_OTHER,
     )
+
