@@ -81,14 +81,32 @@ templates.env.filters[
 ] = _format_timestamp
 
 
+def _current_account(request: Request):
+    """Return the active analyst stored in the session."""
+
+    user_id = request.session.get("user_id")
+
+    if not isinstance(user_id, str) or not user_id:
+        return None
+
+    account = (
+        request.app.state.identity_store
+        .get_by_id(user_id)
+    )
+
+    if account is None or not account.is_active:
+        request.session.clear()
+        return None
+
+    return account
+
+
 def _authenticated(
     request: Request,
 ) -> bool:
-    """Return whether the session is authenticated."""
+    """Return whether an active analyst is signed in."""
 
-    return bool(
-        request.session.get("authenticated")
-    )
+    return _current_account(request) is not None
 
 
 def _csrf_token(
@@ -169,7 +187,7 @@ def root() -> Response:
 def dashboard_login_page(
     request: Request,
 ) -> Response:
-    """Display the dashboard login form."""
+    """Display the analyst login form."""
 
     if _authenticated(request):
         return RedirectResponse(
@@ -193,7 +211,11 @@ def dashboard_login_page(
 )
 def dashboard_login(
     request: Request,
-    api_key: Annotated[
+    email: Annotated[
+        str,
+        Form(min_length=3),
+    ],
+    password: Annotated[
         str,
         Form(min_length=1),
     ],
@@ -202,7 +224,7 @@ def dashboard_login(
         Form(min_length=1),
     ],
 ) -> Response:
-    """Exchange the SOC API key for a browser session."""
+    """Authenticate an individual SOC analyst."""
 
     if not _valid_csrf_token(
         request,
@@ -210,30 +232,20 @@ def dashboard_login(
     ):
         return _csrf_failure()
 
-    configured_key = getattr(
-        request.app.state,
-        "api_key",
-        None,
-    )
-
-    supplied_key = api_key.strip()
-
-    valid = (
-        isinstance(configured_key, str)
-        and bool(configured_key)
-        and bool(supplied_key)
-        and compare_digest(
-            supplied_key.encode("utf-8"),
-            configured_key.encode("utf-8"),
+    account = (
+        request.app.state.identity_store
+        .authenticate(
+            email=email,
+            password=password,
         )
     )
 
-    if not valid:
+    if account is None:
         return templates.TemplateResponse(
             request=request,
             name="dashboard/login.html",
             context={
-                "error": "Invalid SOC API key.",
+                "error": "Invalid email or password.",
                 "csrf_token": _csrf_token(request),
             },
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -241,6 +253,7 @@ def dashboard_login(
 
     request.session.clear()
     request.session["authenticated"] = True
+    request.session["user_id"] = account.user_id
     request.session["csrf_token"] = (
         secrets.token_urlsafe(32)
     )
@@ -491,7 +504,7 @@ def dashboard_case_update(
             status=normalized_status,
             assigned_to=assigned_to,
             note=note,
-            actor="dashboard-analyst",
+            actor=_current_account(request).email,
         )
     except KeyError:
         return HTMLResponse(

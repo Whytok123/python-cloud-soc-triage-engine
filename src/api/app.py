@@ -16,6 +16,7 @@ from fastapi import (
     status,
 )
 
+from src.identity.store import IdentityStore
 from src.api.dashboard import router as dashboard_router
 from src.api.dependencies import (
     CaseStoreDependency,
@@ -175,6 +176,10 @@ def create_app(
     app.state.input_root = resolved_input_root
     app.state.case_store = SQLiteCaseStore(
         resolved_database
+    )
+
+    app.state.identity_store = IdentityStore(
+        app.state.case_store.database_path
     )
     app.state.api_key = resolved_api_key
 

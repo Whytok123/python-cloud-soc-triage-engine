@@ -1,6 +1,6 @@
 {% extends "dashboard/base.html" %}
 
-{% block title %}SOC Login{% endblock %}
+{% block title %}Analyst Login{% endblock %}
 
 {% block content %}
 <section class="login-shell">
@@ -12,8 +12,7 @@
         <h1>Sign in to the SOC dashboard</h1>
 
         <p class="muted">
-            Enter the API key configured for this
-            SOC Copilot deployment.
+            Use your individual analyst account.
         </p>
 
         {% if error %}
@@ -33,17 +32,29 @@
                 value="{{ csrf_token }}"
             >
 
-            <label for="api_key">
-                SOC API key
+            <label for="email">
+                Analyst email
             </label>
 
             <input
-                id="api_key"
-                name="api_key"
+                id="email"
+                name="email"
+                type="email"
+                required
+                autocomplete="username"
+                autofocus
+            >
+
+            <label for="password">
+                Password
+            </label>
+
+            <input
+                id="password"
+                name="password"
                 type="password"
                 required
                 autocomplete="current-password"
-                autofocus
             >
 
             <button

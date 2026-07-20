@@ -24,13 +24,21 @@ TEST_SESSION_SECRET = (
 
 
 def build_app(tmp_path):
-    return create_app(
+    app = create_app(
         database_path=tmp_path / "cases.db",
         input_root=INPUT_ROOT,
         api_key=TEST_API_KEY,
         session_secret=TEST_SESSION_SECRET,
     )
 
+    app.state.identity_store.create_account(
+        email="alice@example.com",
+        display_name="Alice Analyst",
+        password="Secure-Test-Password-2026!",
+        role="analyst",
+    )
+
+    return app
 
 def build_packet() -> dict:
     return {
@@ -80,22 +88,29 @@ def login(client: TestClient) -> str:
     response = client.post(
         "/dashboard/login",
         data={
-            "api_key": TEST_API_KEY,
+            "email": "alice@example.com",
+            "password": (
+                "Secure-Test-Password-2026!"
+            ),
             "csrf_token": csrf_token,
         },
         follow_redirects=False,
     )
 
     assert response.status_code == 303
+    assert response.headers["location"] == (
+        "/dashboard"
+    )
 
-    dashboard = client.get("/dashboard")
+    dashboard = client.get(
+        "/dashboard"
+    )
 
     assert dashboard.status_code == 200
 
     return extract_csrf(
         dashboard.text
     )
-
 
 def test_dashboard_requires_login(tmp_path):
     client = TestClient(
