@@ -26,6 +26,7 @@ from src.api.dependencies import (
     DatabasePathDependency,
     InputRootDependency,
 )
+from src.api.rate_limit import SlidingWindowRateLimiter
 from src.api.security import configure_api_key_auth
 from src.api.schemas import (
     AuditEventResponse,
@@ -173,6 +174,51 @@ def create_app(
         in {"1", "true", "yes", "on"}
     )
 
+    try:
+        login_rate_limit = int(
+            os.getenv(
+                "SOC_LOGIN_RATE_LIMIT",
+                "10",
+            )
+        )
+
+        login_rate_window_seconds = int(
+            os.getenv(
+                "SOC_LOGIN_RATE_WINDOW_SECONDS",
+                "60",
+            )
+        )
+
+        api_rate_limit = int(
+            os.getenv(
+                "SOC_API_RATE_LIMIT",
+                "120",
+            )
+        )
+
+        api_rate_window_seconds = int(
+            os.getenv(
+                "SOC_API_RATE_WINDOW_SECONDS",
+                "60",
+            )
+        )
+    except ValueError as error:
+        raise ValueError(
+            "Rate-limit configuration values "
+            "must be integers."
+        ) from error
+
+    if min(
+        login_rate_limit,
+        login_rate_window_seconds,
+        api_rate_limit,
+        api_rate_window_seconds,
+    ) < 1:
+        raise ValueError(
+            "Rate-limit configuration values "
+            "must be positive."
+        )
+
     app = FastAPI(
         title="AI SOC Copilot API",
         description=(
@@ -201,6 +247,26 @@ def create_app(
         app.state.identity_store.database_path
     )
     app.state.api_key = resolved_api_key
+
+    app.state.rate_limiter = (
+        SlidingWindowRateLimiter()
+    )
+
+    app.state.login_rate_limit = (
+        login_rate_limit
+    )
+
+    app.state.login_rate_window_seconds = (
+        login_rate_window_seconds
+    )
+
+    app.state.api_rate_limit = (
+        api_rate_limit
+    )
+
+    app.state.api_rate_window_seconds = (
+        api_rate_window_seconds
+    )
 
     app.add_middleware(
         SessionMiddleware,

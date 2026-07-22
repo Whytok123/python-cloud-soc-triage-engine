@@ -36,6 +36,36 @@ def _is_public_path(path: str) -> bool:
     )
 
 
+def _client_address(
+    request: Request,
+) -> str:
+    """Return the direct network peer address."""
+
+    client = request.client
+
+    if client is None:
+        return "unknown"
+
+    host = client.host.strip().lower()
+
+    return host or "unknown"
+
+
+def _rate_limit_headers(
+    decision,
+) -> dict[str, str]:
+    """Build standard rate-limit headers."""
+
+    return {
+        "X-RateLimit-Limit": str(
+            decision.limit
+        ),
+        "X-RateLimit-Remaining": str(
+            decision.remaining
+        ),
+    }
+
+
 def configure_api_key_auth(app: FastAPI) -> None:
     """Require an API key for protected JSON API endpoints."""
 
@@ -92,4 +122,51 @@ def configure_api_key_auth(app: FastAPI) -> None:
                 },
             )
 
-        return await call_next(request)
+        limiter = getattr(
+            request.app.state,
+            "rate_limiter",
+            None,
+        )
+
+        if limiter is None:
+            return await call_next(request)
+
+        decision = limiter.check(
+            (
+                "api:"
+                + _client_address(request)
+            ),
+            limit=request.app.state.api_rate_limit,
+            window_seconds=(
+                request.app.state
+                .api_rate_window_seconds
+            ),
+        )
+
+        rate_headers = _rate_limit_headers(
+            decision
+        )
+
+        if not decision.allowed:
+            rate_headers["Retry-After"] = str(
+                decision.retry_after_seconds
+            )
+
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": (
+                        "Too many API requests. "
+                        "Try again later."
+                    )
+                },
+                headers=rate_headers,
+            )
+
+        response = await call_next(request)
+
+        response.headers.update(
+            rate_headers
+        )
+
+        return response

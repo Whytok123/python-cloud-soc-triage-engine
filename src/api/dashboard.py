@@ -232,6 +232,36 @@ def root() -> Response:
     )
 
 
+def _login_client_address(
+    request: Request,
+) -> str:
+    """Return the direct login client address."""
+
+    client = request.client
+
+    if client is None:
+        return "unknown"
+
+    host = client.host.strip().lower()
+
+    return host or "unknown"
+
+
+def _login_rate_limit_headers(
+    decision,
+) -> dict[str, str]:
+    """Build login rate-limit response headers."""
+
+    return {
+        "X-RateLimit-Limit": str(
+            decision.limit
+        ),
+        "X-RateLimit-Remaining": str(
+            decision.remaining
+        ),
+    }
+
+
 @router.get(
     "/dashboard/login",
     response_class=HTMLResponse,
@@ -278,11 +308,62 @@ def dashboard_login(
 ) -> Response:
     """Authenticate an individual SOC analyst."""
 
+    limiter = request.app.state.rate_limiter
+
+    decision = limiter.check(
+        (
+            "login:"
+            + _login_client_address(request)
+        ),
+        limit=(
+            request.app.state.login_rate_limit
+        ),
+        window_seconds=(
+            request.app.state
+            .login_rate_window_seconds
+        ),
+    )
+
+    rate_limit_headers = (
+        _login_rate_limit_headers(decision)
+    )
+
+    if not decision.allowed:
+        rate_limit_headers[
+            "Retry-After"
+        ] = str(
+            decision.retry_after_seconds
+        )
+
+        return templates.TemplateResponse(
+            request=request,
+            name="dashboard/login.html",
+            context={
+                "error": (
+                    "Too many login requests. "
+                    "Try again shortly."
+                ),
+                "csrf_token": _csrf_token(
+                    request
+                ),
+            },
+            status_code=(
+                status.HTTP_429_TOO_MANY_REQUESTS
+            ),
+            headers=rate_limit_headers,
+        )
+
     if not _valid_csrf_token(
         request,
         csrf_token,
     ):
-        return _csrf_failure()
+        response = _csrf_failure()
+
+        response.headers.update(
+            rate_limit_headers
+        )
+
+        return response
 
     identity_store = (
         request.app.state.identity_store
@@ -341,6 +422,7 @@ def dashboard_login(
                 "csrf_token": _csrf_token(request),
             },
             status_code=status.HTTP_401_UNAUTHORIZED,
+            headers=rate_limit_headers,
         )
 
     login_security.record_success(
@@ -382,6 +464,7 @@ def dashboard_login(
     return RedirectResponse(
         url="/dashboard",
         status_code=status.HTTP_303_SEE_OTHER,
+        headers=rate_limit_headers,
     )
 
 
