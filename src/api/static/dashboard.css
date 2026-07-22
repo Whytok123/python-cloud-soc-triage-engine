@@ -769,3 +769,21 @@ dd {
         width: 240px;
     }
 }
+
+.state-locked {
+    background: rgba(255, 96, 112, 0.14);
+    color: #ff9aa5;
+}
+
+.state-warning {
+    background: rgba(255, 190, 80, 0.14);
+    color: #ffd28a;
+}
+
+#login-security-panel {
+    margin-top: 24px;
+}
+
+#login-security-panel .muted {
+    margin-top: 6px;
+}

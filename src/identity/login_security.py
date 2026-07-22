@@ -480,3 +480,112 @@ class LoginSecurityStore:
                 """,
                 (normalized_email,),
             )
+
+    def list_states(
+        self,
+        *,
+        include_clean: bool = False,
+    ) -> list[LoginSecurityState]:
+        """List current login-security states."""
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    email,
+                    failed_attempts,
+                    locked_until,
+                    last_failed_at,
+                    updated_at
+                FROM identity_login_security
+                ORDER BY
+                    failed_attempts DESC,
+                    email ASC
+                """
+            ).fetchall()
+
+        states: list[LoginSecurityState] = []
+
+        for row in rows:
+            state = self._row_to_state(row)
+
+            if (
+                state.locked_until is not None
+                and not state.is_locked
+            ):
+                self.clear_state(state.email)
+                continue
+
+            has_security_activity = (
+                state.failed_attempts > 0
+                or state.is_locked
+            )
+
+            if (
+                include_clean
+                or has_security_activity
+            ):
+                states.append(state)
+
+        return states
+
+    def unlock_account(
+        self,
+        email: str,
+        *,
+        identity_store: IdentityStore,
+        actor_user_id: str,
+        actor_email: str,
+    ) -> LoginSecurityState:
+        """Clear an account lockout as an administrator."""
+
+        normalized_email = _normalize_email(
+            email
+        )
+
+        if not normalized_email:
+            raise ValueError(
+                "A valid account email is required."
+            )
+
+        account = identity_store.get_by_email(
+            normalized_email
+        )
+
+        if account is None:
+            raise KeyError(
+                f"Unknown account: {normalized_email}"
+            )
+
+        previous_state = self.get_state(
+            normalized_email
+        )
+
+        if (
+            previous_state is None
+            or not previous_state.is_locked
+        ):
+            raise ValueError(
+                "The account is not currently locked."
+            )
+
+        self.clear_state(normalized_email)
+
+        identity_store.record_audit_event(
+            actor_user_id=actor_user_id,
+            actor_email=actor_email,
+            target_user_id=account.user_id,
+            action="account_unlocked",
+            details={
+                "method": "administrator",
+                "target_email": account.email,
+                "previous_failed_attempts": (
+                    previous_state.failed_attempts
+                ),
+                "previous_locked_until": (
+                    previous_state.locked_until
+                ),
+            },
+        )
+
+        return previous_state

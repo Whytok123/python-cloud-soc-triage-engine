@@ -820,6 +820,32 @@ def dashboard_admin_analysts(
 
     analysts = identity_store.list_accounts()
 
+    login_security = (
+        request.app.state.login_security_store
+    )
+
+    login_security_rows = []
+
+    for security_state in (
+        login_security.list_states()
+    ):
+        security_account = (
+            identity_store.get_by_email(
+                security_state.email
+            )
+        )
+
+        if security_account is None:
+            continue
+
+        login_security_rows.append(
+            {
+                "account": security_account,
+                "state": security_state,
+            }
+        )
+
+
     notice = request.query_params.get(
         "notice"
     )
@@ -830,6 +856,7 @@ def dashboard_admin_analysts(
         context={
             "current_account": account,
             "analysts": analysts,
+            "login_security_rows": login_security_rows,
             "analyst_roles": sorted(
                 ALLOWED_ANALYST_ROLES
             ),
@@ -1414,4 +1441,84 @@ def dashboard_identity_audit(
             "audit_events": audit_events,
             "account_lookup": account_lookup,
         },
+    )
+
+
+@router.post(
+    "/dashboard/admin/analysts/"
+    "{user_id}/unlock"
+)
+def dashboard_admin_unlock_analyst(
+    request: Request,
+    user_id: str,
+    csrf_token: Annotated[
+        str,
+        Form(min_length=1),
+    ],
+) -> Response:
+    """Unlock an analyst account as an administrator."""
+
+    account = _admin_account(request)
+
+    if account is None:
+        return _login_redirect()
+
+    if account is False:
+        return _permission_denied(
+            "Administrator access is required."
+        )
+
+    if not _valid_csrf_token(
+        request,
+        csrf_token,
+    ):
+        return _csrf_failure()
+
+    identity_store = (
+        request.app.state.identity_store
+    )
+
+    target = identity_store.get_by_id(
+        user_id
+    )
+
+    if target is None:
+        return HTMLResponse(
+            content="<h1>Account not found</h1>",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    login_security = (
+        request.app.state.login_security_store
+    )
+
+    try:
+        login_security.unlock_account(
+            target.email,
+            identity_store=identity_store,
+            actor_user_id=account.user_id,
+            actor_email=account.email,
+        )
+    except ValueError as error:
+        return HTMLResponse(
+            content=(
+                "<h1>Account unlock failed</h1>"
+                f"<p>{error}</p>"
+            ),
+            status_code=(
+                status.HTTP_400_BAD_REQUEST
+            ),
+        )
+    except KeyError:
+        return HTMLResponse(
+            content="<h1>Account not found</h1>",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    return RedirectResponse(
+        url=(
+            "/dashboard/admin/analysts"
+            "?notice=unlocked"
+        ),
+        status_code=status.HTTP_303_SEE_OTHER,
     )

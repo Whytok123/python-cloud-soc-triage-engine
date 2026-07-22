@@ -40,6 +40,10 @@ Analyst Administration
 <div class="alert alert-success">
     Analyst password reset successfully.
 </div>
+{% elif notice == "unlocked" %}
+<div class="alert alert-success">
+    Analyst login lockout cleared successfully.
+</div>
 {% endif %}
 
 <section class="panel">
@@ -364,4 +368,123 @@ Analyst Administration
         </table>
     </div>
 </section>
+
+<section
+    id="login-security-panel"
+    class="panel"
+>
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">
+                Authentication protection
+            </p>
+
+            <h2>Login security</h2>
+        </div>
+
+        <span class="count-badge">
+            {{ login_security_rows | length }}
+            active records
+        </span>
+    </div>
+
+    <p class="muted">
+        Accounts are temporarily locked after five
+        failed sign-in attempts.
+    </p>
+
+    <div class="table-scroll">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Analyst</th>
+                    <th>Failed attempts</th>
+                    <th>Security state</th>
+                    <th>Locked until</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for row in login_security_rows %}
+                <tr>
+                    <td>
+                        <strong>
+                            {{ row.account.display_name }}
+                        </strong>
+
+                        <small>
+                            {{ row.account.email }}
+                        </small>
+                    </td>
+
+                    <td>
+                        {{ row.state.failed_attempts }}
+                    </td>
+
+                    <td>
+                        {% if row.state.is_locked %}
+                        <span
+                            class="state-badge state-locked"
+                        >
+                            Locked
+                        </span>
+                        {% else %}
+                        <span
+                            class="state-badge state-warning"
+                        >
+                            Failed attempts
+                        </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if row.state.locked_until %}
+                            {{ row.state.locked_until
+                                | soc_datetime
+                            }}
+                        {% else %}
+                            Not locked
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if row.state.is_locked %}
+                        <form
+                            method="post"
+                            action="/dashboard/admin/analysts/{{ row.account.user_id }}/unlock"
+                        >
+                            <input
+                                type="hidden"
+                                name="csrf_token"
+                                value="{{ csrf_token }}"
+                            >
+
+                            <button
+                                class="button button-secondary button-small"
+                                type="submit"
+                            >
+                                Unlock account
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="muted">
+                            Monitoring
+                        </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5">
+                        No failed-login or lockout
+                        records are active.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
 {% endblock %}
