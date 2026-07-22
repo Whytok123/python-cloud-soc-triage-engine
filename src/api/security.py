@@ -6,6 +6,7 @@ from hmac import compare_digest
 
 from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse
+from src.api.client_address import resolve_request_client_address
 
 
 PUBLIC_PATHS = {
@@ -39,16 +40,13 @@ def _is_public_path(path: str) -> bool:
 def _client_address(
     request: Request,
 ) -> str:
-    """Return the direct network peer address."""
+    """Return the safely resolved API client address."""
 
-    client = request.client
+    result = resolve_request_client_address(
+        request
+    )
 
-    if client is None:
-        return "unknown"
-
-    host = client.host.strip().lower()
-
-    return host or "unknown"
+    return result.address
 
 
 def _rate_limit_headers(

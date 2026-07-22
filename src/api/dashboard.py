@@ -22,6 +22,7 @@ from fastapi.responses import (
 )
 from fastapi.templating import Jinja2Templates
 
+from src.api.client_address import resolve_request_client_address
 from src.cases.models import ALLOWED_CASE_STATUSES
 from src.identity.models import ALLOWED_ANALYST_ROLES
 from src.identity.permissions import (
@@ -235,16 +236,13 @@ def root() -> Response:
 def _login_client_address(
     request: Request,
 ) -> str:
-    """Return the direct login client address."""
+    """Return the safely resolved login client address."""
 
-    client = request.client
+    result = resolve_request_client_address(
+        request
+    )
 
-    if client is None:
-        return "unknown"
-
-    host = client.host.strip().lower()
-
-    return host or "unknown"
+    return result.address
 
 
 def _login_rate_limit_headers(

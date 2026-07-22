@@ -26,6 +26,7 @@ from src.api.dependencies import (
     DatabasePathDependency,
     InputRootDependency,
 )
+from src.api.client_address import TrustedProxyResolver
 from src.api.rate_limit import SlidingWindowRateLimiter
 from src.api.security import configure_api_key_auth
 from src.api.schemas import (
@@ -219,6 +220,14 @@ def create_app(
             "must be positive."
         )
 
+    trusted_proxy_resolver = (
+        TrustedProxyResolver.from_csv(
+            os.getenv(
+                "SOC_TRUSTED_PROXY_CIDRS"
+            )
+        )
+    )
+
     app = FastAPI(
         title="AI SOC Copilot API",
         description=(
@@ -250,6 +259,10 @@ def create_app(
 
     app.state.rate_limiter = (
         SlidingWindowRateLimiter()
+    )
+
+    app.state.trusted_proxy_resolver = (
+        trusted_proxy_resolver
     )
 
     app.state.login_rate_limit = (
